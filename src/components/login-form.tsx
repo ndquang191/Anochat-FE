@@ -17,16 +17,27 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 		setError(null);
 
 		try {
-			const { error } = await supabase.auth.signInWithOAuth({
+			const { data, error } = await supabase.auth.signInWithOAuth({
 				provider: "google",
 				options: {
-					redirectTo: `${window.location.origin}/auth/oauth?next=/chat`,
+					redirectTo: `${window.location.origin}/login`,
+					queryParams: {
+						access_type: "offline",
+						prompt: "consent",
+					},
 				},
 			});
 
 			if (error) throw error;
+
+			// If we have a provider URL, redirect to it
+			if (data?.url) {
+				window.location.href = data.url;
+			} else {
+				throw new Error("No provider URL returned");
+			}
 		} catch (error: unknown) {
-			setError(error instanceof Error ? error.message : "An error occurred");
+			setError(error instanceof Error ? error.message : "An error occurred during login");
 			setIsLoading(false);
 		}
 	};
@@ -41,7 +52,11 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 				<CardContent>
 					<form onSubmit={handleSocialLogin}>
 						<div className="flex flex-col gap-6">
-							{error && <p className="text-sm text-destructive-500">{error}</p>}
+							{error && (
+								<p className="text-sm text-destructive-500 bg-destructive-50 p-2 rounded">
+									{error}
+								</p>
+							)}
 							<Button type="submit" className="w-full" disabled={isLoading}>
 								{isLoading ? "Logging in..." : "Continue with Google"}
 							</Button>
