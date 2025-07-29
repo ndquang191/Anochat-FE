@@ -18,17 +18,19 @@ interface Tip {
 	content: string;
 }
 
-export function Chatbox() {
+const INITIAL_MESSAGES: Message[] = [
+	{ id: 1, text: "Chào bạn! Tôi có thể giúp gì cho bạn?", sender: "other" },
+	{ id: 2, text: "Chào bạn! Tôi muốn hỏi về sản phẩm X.", sender: "user" },
+	{
+		id: 3,
+		text: "Sản phẩm X có các tính năng A, B, C. Bạn muốn tìm hiểu thêm về tính năng nào?",
+		sender: "other",
+	},
+];
+
+export default function ChatBox() {
 	const { isConnected, isConnecting } = useConnection();
-	const [messages, setMessages] = React.useState<Message[]>([
-		{ id: 1, text: "Chào bạn! Tôi có thể giúp gì cho bạn?", sender: "other" },
-		{ id: 2, text: "Chào bạn! Tôi muốn hỏi về sản phẩm X.", sender: "user" },
-		{
-			id: 3,
-			text: "Sản phẩm X có các tính năng A, B, C. Bạn muốn tìm hiểu thêm về tính năng nào?",
-			sender: "other",
-		},
-	]);
+	const [messages, setMessages] = React.useState<Message[]>(INITIAL_MESSAGES);
 	const [tips, setTips] = React.useState<Tip[]>([]);
 	const [inputMessage, setInputMessage] = React.useState("");
 	const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -41,56 +43,48 @@ export function Chatbox() {
 			.catch((err) => console.error("Failed to load tips:", err));
 	}, []);
 
-	const scrollToBottom = () => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	};
+	const scrollToBottom = React.useCallback(() => {
+		if (messagesEndRef.current) {
+			messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+		}
+	}, []);
 
 	React.useEffect(() => {
 		scrollToBottom();
-	}, [messages]);
+	}, [messages, scrollToBottom]);
 
-	const handleSendMessage = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (inputMessage.trim() === "") return;
+	const handleSendMessage = React.useCallback(
+		(e: React.FormEvent) => {
+			e.preventDefault();
+			if (inputMessage.trim() === "") return;
 
-		const newMessage: Message = {
-			id: messages.length + 1,
-			text: inputMessage,
-			sender: "user",
-		};
-		setMessages((prevMessages) => [...prevMessages, newMessage]);
-		setInputMessage("");
-
-		// Simulate a response from "other" after a short delay
-		setTimeout(() => {
-			const botResponse: Message = {
-				id: messages.length + 2,
-				text: `Bạn vừa nói: "${inputMessage}". Tôi đã nhận được.`,
-				sender: "other",
+			const newMessage: Message = {
+				id: messages.length + 1,
+				text: inputMessage,
+				sender: "user",
 			};
-			setMessages((prevMessages) => [...prevMessages, botResponse]);
-		}, 1000);
-	};
+			setMessages((prevMessages) => [...prevMessages, newMessage]);
+			setInputMessage("");
+
+			// Simulate a response from "other" after a short delay
+			setTimeout(() => {
+				setMessages((prevMessages) => [
+					...prevMessages,
+					{
+						id: prevMessages.length + 1,
+						text: `Bạn vừa nói: "${inputMessage}". Tôi đã nhận được.`,
+						sender: "other",
+					},
+				]);
+			}, 1000);
+		},
+		[inputMessage, messages.length]
+	);
 
 	if (isConnecting) {
 		return (
 			<div className="flex flex-col bg-card text-card-foreground shadow-sm h-full p-4 gap-4">
-				<div className="text-lg font-semibold">Đang kết nối...</div>
-				<div className="space-y-4">
-					{tips.map((tip) => (
-						<div key={tip.id} className="flex items-start gap-2">
-							<div className="w-1 h-1 rounded-full bg-primary mt-2" />
-							<p>{tip.content}</p>
-						</div>
-					))}
-					{tips.length === 0 && (
-						<>
-							<Skeleton className="h-4 w-3/4" />
-							<Skeleton className="h-4 w-2/3" />
-							<Skeleton className="h-4 w-1/2" />
-						</>
-					)}
-				</div>
+				<div className="text-lg font-semibold text-center">Đang kết nối...</div>
 			</div>
 		);
 	}

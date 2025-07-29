@@ -28,7 +28,25 @@ export function AppSidebar({ className, ...props }: React.HTMLAttributes<HTMLDiv
 	const { state } = useSidebar();
 	const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 	const [user, setUser] = React.useState<User | null>(null);
+	const [userProfile, setUserProfile] = React.useState<any>(null);
 	const router = useRouter();
+
+	const fetchUserProfile = async (userId: string) => {
+		const supabase = createClient();
+		try {
+			const { data, error } = await supabase
+				.from('users')
+				.select('*')
+				.eq('id', userId)
+				.single();
+			
+			if (!error && data) {
+				setUserProfile(data);
+			}
+		} catch (error) {
+			console.log('User profile not found in database');
+		}
+	};
 
 	React.useEffect(() => {
 		const fetchUser = async () => {
@@ -36,11 +54,27 @@ export function AppSidebar({ className, ...props }: React.HTMLAttributes<HTMLDiv
 			const { data } = await supabase.auth.getUser();
 			if (data?.user) {
 				setUser(data.user);
+				// Also fetch user profile from users table
+				await fetchUserProfile(data.user.id);
 			} else {
 				setUser(null);
+				setUserProfile(null);
 			}
 		};
 		fetchUser();
+
+		// Listen for auth state changes to refresh user data
+		const supabase = createClient();
+		const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+			if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+				if (session?.user) {
+					setUser(session.user);
+					await fetchUserProfile(session.user.id);
+				}
+			}
+		});
+
+		return () => subscription.unsubscribe();
 	}, []);
 
 	const handleLogout = async () => {
@@ -49,35 +83,55 @@ export function AppSidebar({ className, ...props }: React.HTMLAttributes<HTMLDiv
 		router.push("/login");
 	};
 
-	// You can extend this to fetch more profile info if you store it in user_metadata
-	const name = user?.user_metadata?.name || user?.email || "---";
-	const age = user?.user_metadata?.age || "---";
-	const city = user?.user_metadata?.city || "---";
-	const isPublic = user?.user_metadata?.isPublic ?? true;
+	// Get user data from both auth metadata and users table, prioritizing users table
+	const name = userProfile?.name || user?.user_metadata?.name || user?.email || "---";
+	const nickname = userProfile?.nickname || user?.user_metadata?.nickname || "---";
+	const gender = userProfile?.gender || user?.user_metadata?.gender || "other"; // Default to 'other' instead of '---'
+	const address = userProfile?.address || user?.user_metadata?.address || "---";
+	const isVisible = userProfile?.is_visible ?? user?.user_metadata?.is_visible ?? true;
+
+	// Helper function to display gender in Vietnamese
+	const getGenderDisplay = (genderValue: string) => {
+		switch (genderValue) {
+			case 'male': return 'Nam';
+			case 'female': return 'Nữ';
+			case 'other': return 'Khác';
+			default: return 'Khác';
+		}
+	};
 
 	// For settings dialog, keep the same structure as before, fallback to --- or default values
 	const [userData, setUserData] = React.useState({
 		name: name,
-		age: age === "---" ? 0 : age,
-		city: city === "---" ? "" : city,
-		isPublic: isPublic,
-		chatType: "text",
+		nickname: nickname,
+		gender: gender,
+		address: address,
+		isVisible: isVisible,
 	});
 
 	React.useEffect(() => {
 		setUserData({
 			name: name,
-			age: age === "---" ? 0 : age,
-			city: city === "---" ? "" : city,
-			isPublic: isPublic,
-			chatType: "text",
+			nickname: nickname,
+			gender: gender,
+			address: address,
+			isVisible: isVisible,
 		});
-	}, [name, age, city, isPublic]);
+	}, [name, nickname, gender, address, isVisible]);
 
-	const handleSaveSettings = (newSettings: typeof userData) => {
+	const handleSaveSettings = async (newSettings: typeof userData) => {
+		// Update local state
 		setUserData(newSettings);
 		setIsSettingsOpen(false);
-		// Optionally, update user_metadata in Supabase here
+		
+		// Refresh user data from Supabase to get the latest information
+		const supabase = createClient();
+		const { data } = await supabase.auth.getUser();
+		if (data?.user) {
+			setUser(data.user);
+			// Also refresh user profile from users table
+			await fetchUserProfile(data.user.id);
+		}
 	};
 
 	return (
@@ -93,18 +147,18 @@ export function AppSidebar({ className, ...props }: React.HTMLAttributes<HTMLDiv
 								{state === "expanded" && (
 									<>
 										<span className="text-sm text-muted-foreground">
-											{age !== "---" ? `${age} tuổi, ${city}` : "---"}
+											{address !== "---" ? `${getGenderDisplay(gender)}, ${address}` : getGenderDisplay(gender)}
 										</span>
 										<div className="flex items-center gap-2 mt-2">
 											<Switch
 												id="public-status"
-												checked={userData.isPublic}
+												checked={userData.isVisible}
 												onCheckedChange={(checked) =>
-													setUserData((prev) => ({ ...prev, isPublic: checked }))
+													setUserData((prev) => ({ ...prev, isVisible: checked }))
 												}
 											/>
 											<Label htmlFor="public-status" className="text-sm">
-												{userData.isPublic ? "Công khai thông tin" : "Riêng tư"}
+												{userData.isVisible ? "Công khai thông tin" : "Riêng tư"}
 											</Label>
 										</div>
 									</>

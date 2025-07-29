@@ -6,6 +6,7 @@ import "../globals.css"; // Ensure your global CSS is imported
 import Header from "@/components/header";
 import { ConnectionProvider } from "@/hooks/use-connection";
 import { AlertDialogProvider } from "@/components/alert-dialog-provider";
+import { Toaster } from "sonner";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
 	const cookieStore = await cookies();
@@ -27,6 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 						</SidebarProvider>
 					</ConnectionProvider>
 				</AlertDialogProvider>
+				<Toaster position="top-right" />
 			</body>
 		</html>
 	);

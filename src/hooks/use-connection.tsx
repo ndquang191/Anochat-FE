@@ -25,7 +25,6 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
 		if (status !== "disconnected") return;
 		setStatus("connecting");
 		// Simulate connection delay
-		await new Promise((resolve) => setTimeout(resolve, 5000));
 		setStatus("connected");
 	}, [status]);
 
